@@ -1,0 +1,60 @@
+name: Windows game build
+
+# The Windows job of pc.yml without the unit tests, which do not link on 2ea8bcaf
+# (CNameRegiMenu::CNameRegiMenu() is inline in ps2/src/nameregi.cpp but menu_input_test.cpp calls it).
+on:
+  push:
+    branches: [windows-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Build the game (Windows x64)
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      # Runtime DLLs, including the Vulkan loader, are acquired and bundled by default.
+      - name: Install the toolchain and libraries
+        run: |
+          ./tools/windows/acquire.ps1 -Root $env:RUNNER_TEMP
+
+      - name: Configure
+        run: |
+          ./tools/windows/configure.ps1 -Root $env:RUNNER_TEMP -BuildDirectory $env:GITHUB_WORKSPACE/port/build/windows-x64-release -BuildType Release
+
+      - name: Build
+        run: |
+          ./tools/windows/build.ps1 -Root $env:RUNNER_TEMP -BuildDirectory $env:GITHUB_WORKSPACE/port/build/windows-x64-release
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Package the Windows build
+        run: |
+          ./tools/windows/package.ps1 -BuildDirectory port/build/windows-x64-release -Destination chronicletwo-windows-x64.zip
+
+      - name: Upload the Windows build
+        uses: actions/upload-artifact@v7
+        with:
+          name: chronicletwo-windows-x64
+          path: chronicletwo-windows-x64.zip
+          if-no-files-found: error
+
+      # docs/SYMBOLS.md: the executables (their DWARF), any PDBs and their build ids, for tools/crash/symbolize.py.
+      - name: Package the Windows symbols
+        run: |
+          ./tools/windows/package-symbols.ps1 -Root $env:RUNNER_TEMP -BuildDirectory port/build/windows-x64-release -Destination chronicletwo-windows-x64-symbols.zip
+
+      - name: Upload the Windows symbols
+        uses: actions/upload-artifact@v7
+        with:
+          name: chronicletwo-windows-x64-symbols-${{ github.sha }}
+          path: chronicletwo-windows-x64-symbols.zip
+          if-no-files-found: error
