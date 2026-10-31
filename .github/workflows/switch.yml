@@ -1,0 +1,75 @@
+name: Switch
+
+# The libnx homebrew build (docs/SWITCH.md), on a branch of its own: workflow_dispatch needs the workflow on the default
+# branch, so a push starts it here.
+on:
+  push:
+    branches: [switch-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (Switch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      # Mesa, LLVM and the Rust toolchain in the image want more room than the runner leaves free.
+      - name: Free disk space
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - uses: actions/cache/restore@v5
+        id: image
+        with:
+          path: .kazarov/switch-image.tar.zst
+          key: switch-image-${{ hashFiles('tools/kazarov/tools/switch/**', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}
+
+      - name: Load the toolchain image
+        if: steps.image.outputs.cache-hit == 'true'
+        run: zstd -dc .kazarov/switch-image.tar.zst | docker load
+
+      # port/switch-build.sh and Kazarov's build.sh have no execute bit in Git, so ./build.sh switch stops on a Linux file
+      # system; bash runs Kazarov's directly. Its shell -c true makes the image and nothing else, so the cache below keeps
+      # the image through a failed game build.
+      - name: Build the toolchain image
+        run: bash tools/kazarov/tools/switch/build.sh shell -c true
+
+      - name: Pack the toolchain image
+        if: steps.image.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .kazarov
+          docker save $(docker image ls kazarov-switch --format '{{.Repository}}:{{.Tag}}') | zstd -T0 -o .kazarov/switch-image.tar.zst
+
+      - uses: actions/cache/save@v5
+        if: steps.image.outputs.cache-hit != 'true'
+        with:
+          path: .kazarov/switch-image.tar.zst
+          key: ${{ steps.image.outputs.cache-primary-key }}
+
+      - name: Build the game
+        run: |
+          rm -f .kazarov/switch-image.tar.zst
+          bash tools/kazarov/tools/switch/build.sh
+
+      # Copy chronicletwo/ to sdmc:/switch/, then put data.zip and data.json from a dc2data extraction inside it.
+      - name: Package the Switch build
+        run: |
+          mkdir -p artifacts/chronicletwo
+          (cd port/build/switch && cp -R darkchronicle.nro scripts glyphs fonts "$GITHUB_WORKSPACE/artifacts/chronicletwo/")
+
+      - name: Upload the Switch build
+        uses: actions/upload-artifact@v7
+        with:
+          name: chronicletwo-switch
+          path: artifacts/
+          if-no-files-found: error
