@@ -18,6 +18,8 @@ Launch with Homebrew Menu title override to give the game application memory. Pu
 
 `tools/kazarov/tools/switch/run.sh` sends an existing NRO with nxlink; set `SWITCH_NRO`, `SWITCH_INSTALL_PATH` and, if needed, `SWITCH_ADDRESS`.
 
+The `Switch` workflow (`.github/workflows/switch.yml`) runs this build on pushes to `master`, pull requests and manual dispatches, and uploads `darkchronicle.nro` and its ELF.
+
 ## Runtime
 
 Mesa NVK is built from the same pinned Mesa 26.2.4 Switch backend used by Chronicle. SDL creates a Vulkan surface and the statically linked driver presents its scanout images without a CPU framebuffer copy. Shaders are compiled to SPIR-V on the build host; NVK creates device pipelines at startup and compatible later launches reuse `saves/pipeline_cache.bin`.
