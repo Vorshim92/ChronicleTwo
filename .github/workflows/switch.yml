@@ -28,6 +28,13 @@ jobs:
       - name: Free disk space
         run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
 
+      # The image builds libiconv's lib/ on its own, but only libiconv's top-level Makefile copies localcharset.h there.
+      - name: Patch the toolchain image
+        run: |
+          file=tools/kazarov/tools/switch/Containerfile
+          sed -i 's|&& make -C lib -j|\&\& cp libcharset/include/localcharset.h lib/ \&\& make -C lib -j|' "$file"
+          grep -q 'cp libcharset/include/localcharset.h lib/' "$file"
+
       - uses: actions/cache/restore@v5
         id: image
         with:
