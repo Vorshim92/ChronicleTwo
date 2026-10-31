@@ -260,6 +260,8 @@ set(NATIVE_SOURCES
 list(TRANSFORM NATIVE_SOURCES PREPEND "${PORT_DIR}/")
 file(GLOB_RECURSE PORT_SOURCES CONFIGURE_DEPENDS ${PORT_DIR}/*.cpp)
 list(FILTER PORT_SOURCES EXCLUDE REGEX "/tests/")
+# iOS's std::to_chars is built on its own below; the rest of port/src/ios compiles to nothing off iOS.
+list(FILTER PORT_SOURCES EXCLUDE REGEX "/ios/to_chars\\.cpp$")
 list(REMOVE_ITEM PORT_SOURCES ${NATIVE_SOURCES})
 if(NINTENDO_SWITCH)
     list(FILTER PORT_SOURCES EXCLUDE REGEX "/ios/|/crash/(crash|crash_dialog|crash_report|crash_symbols)\\.cpp$")
