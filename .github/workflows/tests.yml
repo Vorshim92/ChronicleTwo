@@ -69,7 +69,7 @@ jobs:
           brew install cmake ninja
           cmake -S port/src/tests/ios -B port/build/ios-tests -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_OSX_SYSROOT=iphonesimulator -DCMAKE_OSX_DEPLOYMENT_TARGET=16.3 \
+            -DCMAKE_OSX_SYSROOT=iphonesimulator -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 \
             -DCMAKE_BUILD_TYPE=Release \
             "-DCMAKE_CROSSCOMPILING_EMULATOR=xcrun;simctl;spawn;$SIMULATOR_UDID"
           cmake --build port/build/ios-tests --parallel "$(sysctl -n hw.ncpu)"

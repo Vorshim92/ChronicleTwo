@@ -34,7 +34,7 @@ else
         tar xzf "$deps/sdl.tar.gz" -C "$prefix"
         cmake -S "$prefix/SDL-release-3.4.0" -B "$prefix/sdl-build" -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_SYSROOT="$sdk" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.3 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix/sdl" \
             -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
         cmake --build "$prefix/sdl-build" --parallel "$CMAKE_BUILD_PARALLEL_LEVEL"

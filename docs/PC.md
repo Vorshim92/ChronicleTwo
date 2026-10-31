@@ -74,7 +74,7 @@ export VK_DRIVER_FILES="$(brew --prefix)/etc/vulkan/icd.d/MoltenVK_icd.json"
 
 The iOS arm64 build requires macOS and Xcode with Swift C++ interoperability. The
 [build workflow](../.github/workflows/ios.yml) builds SDL3 and FFmpeg, supplies the iOS MoltenVK library,
-and packages an unsigned IPA with its scripts, glyphs and gameplay seed. It targets iOS 16.3 and later;
+and packages an unsigned IPA with its scripts, glyphs and gameplay seed. It targets iOS 17.0 and later;
 install the IPA through a sideloading tool that signs it for your device.
 
 For a local build, export Docker's `apple-deps` target into `.kazarov`, then run
