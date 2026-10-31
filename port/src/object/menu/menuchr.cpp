@@ -383,6 +383,20 @@ std::unique_ptr<CMosBookMenu> &MonsterBookOwner() {
     static std::unique_ptr<CMosBookMenu> owner;
     return owner;
 }
+
+/**
+ *
+ * Detaches a character's sword trail before the arena holding it is reset.
+ *
+ */
+void DetachSwordTrail(CCharacter2 *chara) {
+    if (chara == nullptr) {
+        return;
+    }
+
+    dc2::character::ReleaseResource(*chara, dc2::character::ResourceChannel::Sword, 0);
+    chara->sword_effect[0] = nullptr;
+}
 } // namespace
 
 void dc2::menu::ResetMonsterBook() {
@@ -5358,6 +5372,11 @@ int MenuItemCharaDataLoadEndCheck(MENU_BGREAD_INFO2 **info, mgCMemory *stack, CA
         info[i]->chara = menu_chara[i];
         mgCMemory *buffer = &MenuActionCharaBuffer[i];
 
+        // The melee weapon's arena also holds the body's sword trail.
+        if (i == 2) {
+            DetachSwordTrail(info[0]->chara);
+        }
+
         if (buffer != nullptr) {
             buffer->stReset();
         }
@@ -5382,6 +5401,11 @@ int MenuItemCharaDataLoadEndCheck(MENU_BGREAD_INFO2 **info, mgCMemory *stack, CA
             case MENU_LOAD_MODE_SCENE:
                 if (scene_target[i] != nullptr) {
                     mgCMemory *scene_stack = &MorattaStack[i];
+
+                    if (i == 2) {
+                        DetachSwordTrail(player);
+                    }
+
                     scene_stack->stReset();
                     MenuItemCharaDataLoadPack(chara_no, scene_target[i], player, i, reinterpret_cast<u_int *>(read.Bytes().data()),
                                               scene_stack, scene_tex_block, chara_no);
@@ -5845,6 +5869,10 @@ int MenuItemRoboDataLoadEndCheck(MENU_BGREAD_INFO2 **info, mgCMemory *stack, CAc
 
                 part_stack = scene_stack[part];
 
+                if (part == 1) {
+                    DetachSwordTrail(parent);
+                }
+
                 if (part != 3 && part != 5 && part_stack != nullptr) {
                     part_stack->stReset();
                 }
@@ -5904,6 +5932,10 @@ int MenuItemRoboDataLoadEndCheck(MENU_BGREAD_INFO2 **info, mgCMemory *stack, CAc
                     }
 
                     part_stack = scene_stack[part];
+
+                    if (part == 1) {
+                        DetachSwordTrail(parent);
+                    }
 
                     if (part != 3 && part != 5 && part_stack != nullptr) {
                         part_stack->stReset();
