@@ -80,13 +80,10 @@ export VK_DRIVER_FILES="$(brew --prefix)/etc/vulkan/icd.d/MoltenVK_icd.json"
 
 ### iOS
 
-The iOS arm64 build requires macOS and Xcode with Swift C++ interoperability. The
+The iOS arm64 build requires macOS and Xcode with the iOS 27 SDK or newer. The
 [build workflow](../.github/workflows/ios.yml) builds SDL3 and FFmpeg, supplies the iOS MoltenVK library,
 and packages an unsigned IPA with its scripts, glyphs and gameplay seed. It targets iOS 27 and later;
 install the IPA through a sideloading tool that signs it for your device.
-
-Swift assembly requires LLVM 23 or newer for DWARF-only unwinding. Install Homebrew's `llvm` package
-and export `CT_IOS_DWARF_ASSEMBLER="$(brew --prefix llvm)/bin/clang"` when building locally.
 
 For a local build, export Docker's `apple-deps` target into `.kazarov`, then run
 `bash tools/ci/apple-deps.sh ios-arm64` on macOS. Outside Actions it records the environment in
@@ -174,7 +171,7 @@ Help movie extraction first appears in Kazarov `2e6ef96` (data version 14). The 
 
 Never edit `data.json` to claim the new version: the marker would pass, but the older `data.zip` still lacks the newly extracted assets.
 
-On iOS a launcher (`port/src/ios/Launcher.swift`; the iOS code is Swift under `port/src/ios`, calling the game through `ios/bridge.hpp` with Swift's C++ interoperability) comes up on every start, before the game's window. It shows whether the data is current and offers **Play** only then. Without data it finds a disc image (`.iso`) in the app's Documents folder or its Inbox, where the Files app and Open In put it, or lets the player choose one in Files, opened in place rather than copied; it then extracts into the data root on a worker thread and draws the progress. **Extract Again…** re-extracts over current data, saves and settings untouched. **Settings** lists the APP SETTINGS rows, apart from the bindings, and **Help** explains where the disc image goes, LiveContainer included. The on-screen gamepad starts after the launcher.
+On iOS a launcher (`port/src/ios/Launcher.swift`; the iOS code is Swift under `port/src/ios`, calling the game through the C-compatible interface in `ios/bridge.hpp`) comes up on every start, before the game's window. It shows whether the data is current and offers **Play** only then. Without data it finds a disc image (`.iso`) in the app's Documents folder or its Inbox, where the Files app and Open In put it, or lets the player choose one in Files, opened in place rather than copied; it then extracts into the data root on a worker thread and draws the progress. **Extract Again…** re-extracts over current data, saves and settings untouched. **Settings** lists the APP SETTINGS rows, apart from the bindings, and **Help** explains where the disc image goes, LiveContainer included. The on-screen gamepad starts after the launcher.
 
 `run.sh` and `run.bat` pass `--run-dir <checkout>/port/run`, giving them the data root `port/run/data`, whose parent holds `data.zip`, and `port/run/saves`. A direct executable launch defaults to the per-user `chronicletwo` application data root with the same layout. They also set `DC2_LOG=debug` when it is unset, so the console shows debug lines ([logging](LOGGING.md)).
 
