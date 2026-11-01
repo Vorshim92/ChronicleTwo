@@ -48,6 +48,31 @@ jobs:
           restore-keys: |
             compile-linux-${{ inputs.tests && 'tests' || 'build' }}-${{ hashFiles('tools/ci/Dockerfile', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ github.sha }}-
             compile-linux-${{ inputs.tests && 'tests' || 'build' }}-${{ hashFiles('tools/ci/Dockerfile', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+            compile-linux-${{ inputs.tests && 'build' || 'tests' }}-${{ hashFiles('tools/ci/Dockerfile', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+            compile-linux-
+      - name: Rebuild Rust outputs after dependency changes
+        env:
+          RESTORED_CACHE_KEY: ${{ steps.compile-cache.outputs.cache-matched-key }}
+          DEPENDENCY_CACHE_PREFIX: |
+            compile-linux-tests-${{ hashFiles('tools/ci/Dockerfile', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+            compile-linux-build-${{ hashFiles('tools/ci/Dockerfile', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import shutil
+          key = os.environ['RESTORED_CACHE_KEY']
+          prefixes = tuple(os.environ['DEPENDENCY_CACHE_PREFIX'].splitlines())
+          if key and not key.startswith(prefixes):
+              workspace = Path(os.environ['GITHUB_WORKSPACE']).resolve()
+              targets = [workspace / ".kazarov/cargo-target/linux", workspace / "port/build/pc/cargo"]
+              if any(target.resolve() != target or not target.resolve().is_relative_to(workspace) for target in targets):
+                  raise SystemExit('Rust cache paths must be real directories inside the workspace')
+              for target in targets:
+                  if target.exists():
+                      shutil.rmtree(target)
+              print('Dependency inputs changed; cached Rust outputs will be rebuilt.')
+          PY
       - name: ${{ inputs.tests && 'Build and test' || 'Build and package' }}
         env:
           PR_BASE: ${{ github.event.pull_request.base.sha }}

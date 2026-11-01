@@ -54,6 +54,28 @@ jobs:
             compile-windows-cross-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/windows-toolchain.cmake', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-
             compile-windows-cross-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/windows-toolchain.cmake', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-
             compile-windows-cross-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/windows-toolchain.cmake', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+            compile-windows-cross-
+      - name: Rebuild Rust outputs after dependency changes
+        env:
+          RESTORED_CACHE_KEY: ${{ steps.compile-cache.outputs.cache-matched-key }}
+          DEPENDENCY_CACHE_PREFIX: compile-windows-cross-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/windows-toolchain.cmake', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import shutil
+          key = os.environ['RESTORED_CACHE_KEY']
+          prefixes = tuple(os.environ['DEPENDENCY_CACHE_PREFIX'].splitlines())
+          if key and not key.startswith(prefixes):
+              workspace = Path(os.environ['GITHUB_WORKSPACE']).resolve()
+              targets = [workspace / ".kazarov/cargo-target/windows-cross", workspace / "port/build/windows-cross-x64-release/cargo"]
+              if any(target.resolve() != target or not target.resolve().is_relative_to(workspace) for target in targets):
+                  raise SystemExit('Rust cache paths must be real directories inside the workspace')
+              for target in targets:
+                  if target.exists():
+                      shutil.rmtree(target)
+              print('Dependency inputs changed; cached Rust outputs will be rebuilt.')
+          PY
       - name: Build Windows executables
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/work" \
