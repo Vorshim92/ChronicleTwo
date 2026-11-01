@@ -29,6 +29,9 @@ if [ ! -x "$deps/bin/cxxbridge" ]; then
     cargo install --locked cxxbridge-cmd --version 1.0.205 --root "$deps"
 fi
 if [ "$platform" = macos-arm64 ]; then
+    MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET:-$(python3 -c 'import json, sys; presets = json.load(open(sys.argv[1]))["configurePresets"]; print(next(p["cacheVariables"]["CMAKE_OSX_DEPLOYMENT_TARGET"] for p in presets if p["name"] == "macos"))' "$root/CMakePresets.json")}
+    export MACOSX_DEPLOYMENT_TARGET
+    echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET" >> "$GITHUB_ENV"
     install_formulae llvm lld cmake ninja python glslang sdl3 vulkan-headers vulkan-loader vulkan-tools molten-vk ccache
     ffmpeg=$root/.kazarov/ffmpeg/darwin-arm64
     python3 "$deps/kz-ffmpeg" --tarball "$deps/ffmpeg.tar.xz" --out "$ffmpeg" --jobs "$CMAKE_BUILD_PARALLEL_LEVEL"
