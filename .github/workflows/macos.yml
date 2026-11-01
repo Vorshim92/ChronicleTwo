@@ -59,8 +59,9 @@ jobs:
         run: |
           test "$(shasum -a 256 .kazarov/bundle/deps.tar.gz | cut -d' ' -f1)" = "$(cat .kazarov/bundle/deps.sha256)"
           tar xzf .kazarov/bundle/deps.tar.gz -C .kazarov
-      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
-        id: compile-cache
+      - name: Restore native Apple dependencies
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        id: native-deps-cache
         with:
           path: |
             ~/Library/Caches/Homebrew
@@ -68,16 +69,23 @@ jobs:
             ~/.cargo/git
             .kazarov/deps/bin
             .kazarov/ffmpeg/darwin-arm64
+          key: native-deps-macos-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}
+      - name: Restore reusable compiler outputs
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        id: compile-cache
+        with:
+          path: |
             .kazarov/cargo-target/macos
             port/build/macos-arm64-release/cargo
             .kazarov/ccache/macos
             port/build/macos-arm64-release/lto-cache
-          key: compile-macos-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-${{ github.run_attempt }}
+          key: compile-macos-v2-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-${{ github.run_attempt }}
           restore-keys: |
-            compile-macos-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-
-            compile-macos-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-
-            compile-macos-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+            compile-macos-v2-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-
+            compile-macos-v2-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-
+            compile-macos-v2-
       - name: Install the native Apple toolchain
+        id: prepare-native-deps
         run: bash tools/ci/apple-deps.sh macos-arm64
 
       - name: Describe the Vulkan driver
@@ -163,13 +171,20 @@ jobs:
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
-            ~/Library/Caches/Homebrew
-            ~/.cargo/registry
-            ~/.cargo/git
-            .kazarov/deps/bin
-            .kazarov/ffmpeg/darwin-arm64
             .kazarov/cargo-target/macos
             port/build/macos-arm64-release/cargo
             .kazarov/ccache/macos
             port/build/macos-arm64-release/lto-cache
           key: ${{ steps.compile-cache.outputs.cache-primary-key }}
+
+      - name: Save native Apple dependencies
+        if: always() && steps.prepare-native-deps.outcome == 'success' && steps.native-deps-cache.outputs.cache-primary-key != '' && steps.native-deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            ~/.cargo/registry
+            ~/.cargo/git
+            .kazarov/deps/bin
+            .kazarov/ffmpeg/darwin-arm64
+          key: ${{ steps.native-deps-cache.outputs.cache-primary-key }}

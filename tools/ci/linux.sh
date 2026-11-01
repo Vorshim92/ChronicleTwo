@@ -9,6 +9,7 @@ export CARGO_BUILD_JOBS=$CMAKE_BUILD_PARALLEL_LEVEL
 export CARGO_NET_OFFLINE=true
 export CARGO_TARGET_DIR=/work/.kazarov/cargo-target/linux
 export CCACHE_DIR=/work/.kazarov/ccache/linux
+export CCACHE_MAXSIZE=${CCACHE_MAXSIZE:-1G}
 export CCACHE_BASEDIR=/work
 export CCACHE_COMPILERCHECK=content
 export MESA_SHADER_CACHE_DIR=/work/.kazarov/mesa-cache/linux
