@@ -105,8 +105,36 @@ jobs:
         run: cmake --build --preset macos-arm64-release --parallel "$CMAKE_BUILD_PARALLEL_LEVEL"
 
       - name: Test
+        id: functional-tests
         if: env.RUN_TESTS == 'true'
         run: ctest --preset macos-arm64-release --no-tests=error --output-junit tests.xml -E "$MACOS_GPU_REPORT_ONLY"
+
+      - name: Diagnose Metal descriptor handling
+        if: failure() && steps.functional-tests.outcome == 'failure'
+        shell: bash
+        run: |
+          unset KZ_BINDLESS MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS
+          build="$GITHUB_WORKSPACE/port/build/macos-arm64-release"
+          directory="$build/Testing/Temporary/metal-diagnostics"
+          mkdir -p "$directory"
+          filter='^(MglibAspect\.(MenuFormsKeepMessageCursorAndTailWhole|MenuFormsParkPastHalfScaleUi|MenuFormsParkPastOneAndAHalfScaleUi|MenuFormsParkVerticallyOnTallWindow)|TargetPresentation\.WorldLifeGaugeInterpolatesPositionAndHealthAndReuseCuts)$'
+          for mode in bound-textures direct-metal-resources both; do
+            case "$mode" in
+              bound-textures) settings=(KZ_BINDLESS=0) ;;
+              direct-metal-resources) settings=(MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=0) ;;
+              both) settings=(KZ_BINDLESS=0 MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=0) ;;
+            esac
+            log="$directory/$mode.log"
+            if env "${settings[@]}" ctest --test-dir "$build" -j1 --no-tests=error \
+              --fixture-exclude-any gpu_pipeline_cache --timeout 60 -R "$filter" \
+              --output-on-failure --output-junit "$directory/$mode.xml" > "$log" 2>&1; then
+              echo "$mode: passed"
+            else
+              echo "$mode: failed; full output is in the test artifact"
+            fi
+            tail -n 40 "$log"
+          done
+          exit 0
 
       - name: Test cases the hosted runner's virtual GPU renders wrongly (report only)
         if: env.RUN_TESTS == 'true'
