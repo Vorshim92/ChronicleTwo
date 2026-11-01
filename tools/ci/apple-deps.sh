@@ -14,6 +14,8 @@ export CT_DEPS_ROOT=$deps
 export PATH="$deps/bin:$PATH"
 export CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL:-$(sysctl -n hw.ncpu)}
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+export CCACHE_MAXSIZE=${CCACHE_MAXSIZE:-1G}
+echo "CCACHE_MAXSIZE=$CCACHE_MAXSIZE" >> "$GITHUB_ENV"
 install_formulae() {
     local missing=() formula
     for formula in "$@"; do
@@ -33,11 +35,7 @@ if [ "$platform" = macos-arm64 ]; then
     echo "SDL_VULKAN_LIBRARY=$(brew --prefix vulkan-loader)/lib/libvulkan.1.dylib" >> "$GITHUB_ENV"
     echo "VK_DRIVER_FILES=$(brew --prefix)/etc/vulkan/icd.d/MoltenVK_icd.json" >> "$GITHUB_ENV"
 else
-    install_formulae cmake ninja glslang ccache llvm
-    llvm=$(brew --prefix llvm)
-    llvm_version=$("$llvm/bin/clang" -dumpversion)
-    if [ "${llvm_version%%.*}" -lt 23 ]; then brew upgrade llvm; fi
-    echo "CT_IOS_DWARF_ASSEMBLER=$llvm/bin/clang" >> "$GITHUB_ENV"
+    install_formulae cmake ninja glslang ccache
     sdk=iphoneos
     sdk_version=$(xcrun --sdk "$sdk" --show-sdk-version)
     if [ "${sdk_version%%.*}" -lt 27 ]; then
