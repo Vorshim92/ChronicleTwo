@@ -25,6 +25,14 @@ The renderer's cases need a Vulkan device with the features `tools/kazarov/src/c
 
 ### Windows
 
+GitHub Actions cross-compiles Windows releases and test executables on Ubuntu with the `windows` target in `tools/ci/Dockerfile`. Linux host tools build the C++26 and Rust code for `x86_64-pc-windows-gnullvm`; a separate Windows job runs the resulting CPU and Rust tests with an official Python installation. Cross builds use `port/build/windows-cross-x64-release`, keeping their CMake cache separate from native Windows builds.
+
+The Windows and macOS workflows each compile, test and package one build per push or pull request. The Tests workflow covers Linux and the iOS simulator; it does not repeat the desktop release builds. Manual desktop runs can disable tests with the `tests` input.
+
+For a local cross build, run `docker build --target windows -f tools/ci/Dockerfile -t chronicletwo-ci:windows .`, then `docker run --rm -v "${PWD}:/work" chronicletwo-ci:windows bash tools/ci/windows.sh build` from Bash. Use `tests` to compile the test executables as well. Run `python3 tools/ci/windows-package.py build` inside that container to validate the bundled DLL imports and symbol lookup and write the runtime and symbol ZIPs under `artifacts/`.
+
+CI images pin their base-image digests and Ubuntu package snapshot. Rust comes from its official image, target libraries from rustup, and bridge generators from Cargo with locked dependencies. The Docker source bundle verifies upstream archive checksums, rejects conflicting pins, and keeps its download layer cached across unrelated CMake edits. CMake consumes only those verified sources, and Linux and Windows compilation use the Cargo dependencies fetched into the image without network access. BuildKit, compiler, Rust and ThinLTO caches are reused across runs. GPU tests share a CTest resource lock so renderer startup cannot exhaust hosted-runner resources while CPU tests remain parallel.
+
 ```bat
 .\build.bat windows-x64
 .\run.bat windows-x64
@@ -72,9 +80,9 @@ export VK_DRIVER_FILES="$(brew --prefix)/etc/vulkan/icd.d/MoltenVK_icd.json"
 
 ### iOS
 
-The iOS arm64 build requires macOS and Xcode with Swift C++ interoperability. The
+The iOS arm64 build requires macOS and Xcode with the iOS 27 SDK or newer. The
 [build workflow](../.github/workflows/ios.yml) builds SDL3 and FFmpeg, supplies the iOS MoltenVK library,
-and packages an unsigned IPA with its scripts, glyphs and gameplay seed. It targets iOS 16.3 and later;
+and packages an unsigned IPA with its scripts, glyphs and gameplay seed. It targets iOS 27 and later;
 install the IPA through a sideloading tool that signs it for your device.
 
 For a local build, export Docker's `apple-deps` target into `.kazarov`, then run
@@ -163,7 +171,7 @@ Help movie extraction first appears in Kazarov `2e6ef96` (data version 14). The 
 
 Never edit `data.json` to claim the new version: the marker would pass, but the older `data.zip` still lacks the newly extracted assets.
 
-On iOS a launcher (`port/src/ios/Launcher.swift`; the iOS code is Swift under `port/src/ios`, calling the game through `ios/bridge.hpp` with Swift's C++ interoperability) comes up on every start, before the game's window. It shows whether the data is current and offers **Play** only then. Without data it finds a disc image (`.iso`) in the app's Documents folder or its Inbox, where the Files app and Open In put it, or lets the player choose one in Files, opened in place rather than copied; it then extracts into the data root on a worker thread and draws the progress. **Extract Again…** re-extracts over current data, saves and settings untouched. **Settings** lists the APP SETTINGS rows, apart from the bindings, and **Help** explains where the disc image goes, LiveContainer included. The on-screen gamepad starts after the launcher.
+On iOS a launcher (`port/src/ios/Launcher.swift`; the iOS code is Swift under `port/src/ios`, calling the game through the C-compatible interface in `ios/bridge.hpp`) comes up on every start, before the game's window. It shows whether the data is current and offers **Play** only then. Without data it finds a disc image (`.iso`) in the app's Documents folder or its Inbox, where the Files app and Open In put it, or lets the player choose one in Files, opened in place rather than copied; it then extracts into the data root on a worker thread and draws the progress. **Extract Again…** re-extracts over current data, saves and settings untouched. **Settings** lists the APP SETTINGS rows, apart from the bindings, and **Help** explains where the disc image goes, LiveContainer included. The on-screen gamepad starts after the launcher.
 
 `run.sh` and `run.bat` pass `--run-dir <checkout>/port/run`, giving them the data root `port/run/data`, whose parent holds `data.zip`, and `port/run/saves`. A direct executable launch defaults to the per-user `chronicletwo` application data root with the same layout. They also set `DC2_LOG=debug` when it is unset, so the console shows debug lines ([logging](LOGGING.md)).
 
