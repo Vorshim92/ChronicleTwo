@@ -83,6 +83,9 @@ bool Inside(float x) {
     return x >= e.left && x <= e.right;
 }
 
+/**
+ * Writes a captured canonical frame for a failed graphics assertion.
+ */
 void WriteFailureFrame(const std::string &suffix, const std::vector<uint8_t> &rgba, uint32_t width, uint32_t height) {
     const char *capture = std::getenv("DC2_CAPTURE_DIR");
     const auto  directory = capture ? std::filesystem::path(capture) : std::filesystem::path("Testing/Temporary/metal-pixels");
