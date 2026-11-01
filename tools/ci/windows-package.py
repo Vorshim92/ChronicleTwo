@@ -1,0 +1,104 @@
+"""Package cross-built Windows programs and relocate CTest's native test scripts."""
+
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+import zipfile
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+BUILD = ROOT / "port/build/windows-cross-x64-release"
+
+
+def relocate():
+    """Resolve host tool and checkout paths before CTest discovers native tests."""
+    cmake = pathlib.Path(shutil.which("cmake")).as_posix()
+    info = subprocess.check_output([cmake, "--system-information"], text=True)
+    modules = re.search(r'^CMAKE_ROOT "(.+)"$', info, re.MULTILINE)[1] + "/Modules"
+    for path in BUILD.rglob("*.cmake"):
+        text = path.read_text()
+        text = text.replace("/work/", ROOT.as_posix() + "/")
+        text = re.sub(r"/usr/share/cmake-[\d.]+/Modules", lambda _: modules, text)
+        text = text.replace("/usr/bin/cmake", cmake)
+        text = text.replace("/usr/bin/python3", pathlib.Path(sys.executable).as_posix())
+        path.write_text(text)
+
+
+def package(mode):
+    """Keep runtime files, assets and test metadata while omitting compiler outputs."""
+    names = set(BUILD.joinpath("windows-runtime-files.txt").read_text().splitlines())
+    if not {"darkchronicle.exe", "dc2data.exe", "vulkan-1.dll"} <= names:
+        raise RuntimeError("Incomplete Windows runtime manifest")
+    files = set()
+    for name in names:
+        if pathlib.PurePosixPath(name).name != name or "\\" in name:
+            raise ValueError(f"Invalid runtime entry: {name}")
+        files.add(BUILD / name)
+    # Share the native package audit's OS allowlist so both paths reject missing DLLs.
+    audit = ROOT.joinpath("tools/windows/check-runtime.ps1").read_text()
+    system_block = audit.split("$system = @(", 1)[1].split(")", 1)[0]
+    system = set(re.findall(r"'([^']+)'", system_block))
+    bundled = {name.lower() for name in names}
+    for name in names:
+        imports = subprocess.check_output(["llvm-readobj", "--coff-imports", str(BUILD / name)], text=True)
+        for dependency in re.findall(r"^\s*Name: (.+\.(?:dll|drv))$", imports, re.MULTILINE | re.IGNORECASE):
+            dependency = dependency.lower()
+            if dependency.startswith(("api-ms-", "ext-ms-")) or dependency in system or dependency in bundled:
+                continue
+            raise RuntimeError(f"{name} imports unbundled dependency {dependency}")
+    for name in ("assets/data.zip", "Luau-LICENSE.txt", "fonts/ChronicleTwoMessage-Regular.ttf"):
+        files.add(BUILD / name)
+    for directory in ("scripts", "fonts", "glyphs"):
+        files.update(path for path in (BUILD / directory).rglob("*") if path.is_file())
+    files.update(BUILD.glob("*-LICENSE.txt"))
+    runtime_files = set(files)
+    if mode == "tests":
+        files.update(BUILD.rglob("*.exe"))
+        files.update(BUILD.rglob("*.dll"))
+        files.update(path for path in BUILD.rglob("*.cmake") if "_deps" not in path.parts)
+    output = ROOT / "artifacts"
+    output.mkdir(exist_ok=True)
+    executable = BUILD / "darkchronicle.exe"
+    symbols = subprocess.check_output(["llvm-nm", str(executable)], text=True)
+    address = re.search(r"^([0-9a-fA-F]+) T wmain$", symbols, re.MULTILINE)
+    if address is None:
+        raise RuntimeError("Windows executable has no wmain symbol")
+    report = output / "windows-symbol-check.txt"
+    report.write_text(f"#0  darkchronicle.exe+0x{int(address[1], 16) - 0x140000000:x}\n")
+    symbolized = subprocess.check_output([
+        sys.executable, str(ROOT / "tools/crash/symbolize.py"), str(report),
+        "--binary", str(executable), "--llvm-symbolizer", shutil.which("llvm-symbolizer"),
+    ], text=True)
+    if "main.cpp:" not in symbolized:
+        raise RuntimeError(f"Windows symbolization did not resolve main.cpp: {symbolized}")
+    archives = {"chronicletwo-windows-x64.zip": runtime_files}
+    if mode == "tests":
+        archives["windows-test-binaries.zip"] = files
+    for name, contents in archives.items():
+        with zipfile.ZipFile(output / name, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as archive:
+            for path in sorted(contents):
+                archive.write(path, path.relative_to(BUILD))
+    ids = []
+    with zipfile.ZipFile(output / "chronicletwo-windows-x64-symbols.zip", "w", zipfile.ZIP_DEFLATED, compresslevel=1) as archive:
+        for name in ("darkchronicle", "dc2data"):
+            archive.write(BUILD / (name + ".exe"), name + ".exe")
+            debug = subprocess.check_output(["llvm-readobj", "--coff-debug-directory", str(BUILD / (name + ".exe"))], text=True)
+            match = re.search(r"PDBGUID: \{([0-9A-Fa-f-]+)\}\s+PDBAge: (\d+)", debug)
+            build_id = match[1].replace("-", "") + format(int(match[2]), "X") if match else "-"
+            ids.append(f"{name}.exe {build_id}\n")
+            pdb = BUILD / (name + ".pdb")
+            if pdb.exists():
+                archive.write(pdb, pdb.name)
+        archive.writestr("build-ids.txt", "".join(ids))
+
+
+if __name__ == "__main__":
+    mode = sys.argv[1]
+    if mode == "relocate":
+        relocate()
+    elif mode in ("build", "tests"):
+        package(mode)
+    else:
+        raise SystemExit("Expected build, tests, or relocate")

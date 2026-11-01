@@ -14,16 +14,26 @@ export CT_DEPS_ROOT=$deps
 export PATH="$deps/bin:$PATH"
 export CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL:-$(sysctl -n hw.ncpu)}
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+install_formulae() {
+    local missing=() formula
+    for formula in "$@"; do
+        if ! brew list --versions "$formula" >/dev/null 2>&1; then missing+=("$formula"); fi
+    done
+    if [ "${#missing[@]}" -gt 0 ]; then brew install "${missing[@]}"; fi
+}
 rustup toolchain install 1.99.0 --profile minimal
 rustup default 1.99.0
+if [ ! -x "$deps/bin/cxxbridge" ]; then
+    cargo install --locked cxxbridge-cmd --version 1.0.205 --root "$deps"
+fi
 if [ "$platform" = macos-arm64 ]; then
-    brew install llvm lld cmake ninja python glslang sdl3 vulkan-headers vulkan-loader vulkan-tools molten-vk ccache
+    install_formulae llvm lld cmake ninja python glslang sdl3 vulkan-headers vulkan-loader vulkan-tools molten-vk ccache
     ffmpeg=$root/.kazarov/ffmpeg/darwin-arm64
     python3 "$deps/kz-ffmpeg" --tarball "$deps/ffmpeg.tar.xz" --out "$ffmpeg" --jobs "$CMAKE_BUILD_PARALLEL_LEVEL"
     echo "SDL_VULKAN_LIBRARY=$(brew --prefix vulkan-loader)/lib/libvulkan.1.dylib" >> "$GITHUB_ENV"
     echo "VK_DRIVER_FILES=$(brew --prefix)/etc/vulkan/icd.d/MoltenVK_icd.json" >> "$GITHUB_ENV"
 else
-    brew install cmake ninja glslang ccache
+    install_formulae cmake ninja glslang ccache
     sdk=iphoneos
     triple=aarch64-apple-ios
     slice=ios-arm64

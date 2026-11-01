@@ -6,6 +6,7 @@ git config --global --add safe.directory /work
 mode=${1:?expected build or tests}
 export CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL:-$(nproc)}
 export CARGO_BUILD_JOBS=$CMAKE_BUILD_PARALLEL_LEVEL
+export CARGO_NET_OFFLINE=true
 export CARGO_TARGET_DIR=/work/.kazarov/cargo-target/linux
 export CCACHE_DIR=/work/.kazarov/ccache/linux
 export CCACHE_BASEDIR=/work

@@ -25,6 +25,14 @@ The renderer's cases need a Vulkan device with the features `tools/kazarov/src/c
 
 ### Windows
 
+GitHub Actions cross-compiles Windows releases and test executables on Ubuntu with the `windows` target in `tools/ci/Dockerfile`. Linux host tools build the C++26 and Rust code for `x86_64-pc-windows-gnullvm`; a separate Windows job runs the resulting CPU and Rust tests with an official Python installation. Cross builds use `port/build/windows-cross-x64-release`, keeping their CMake cache separate from native Windows builds.
+
+The Windows and macOS workflows each compile, test and package one build per push or pull request. The Tests workflow covers Linux and the iOS simulator; it does not repeat the desktop release builds. Manual desktop runs can disable tests with the `tests` input.
+
+For a local cross build, run `docker build --target windows -f tools/ci/Dockerfile -t chronicletwo-ci:windows .`, then `docker run --rm -v "${PWD}:/work" chronicletwo-ci:windows bash tools/ci/windows.sh build` from Bash. Use `tests` to compile the test executables as well. Run `python3 tools/ci/windows-package.py build` inside that container to validate the bundled DLL imports and symbol lookup and write the runtime and symbol ZIPs under `artifacts/`.
+
+CI images pin their base-image digests and Ubuntu package snapshot. Rust comes from its official image, target libraries from rustup, and bridge generators from Cargo with locked dependencies. The Docker source bundle verifies upstream archive checksums, rejects conflicting pins, and keeps its download layer cached across unrelated CMake edits. CMake consumes only those verified sources, and Linux and Windows compilation use the Cargo dependencies fetched into the image without network access. BuildKit, compiler, Rust and ThinLTO caches are reused across runs. GPU tests share a CTest resource lock so renderer startup cannot exhaust hosted-runner resources while CPU tests remain parallel.
+
 ```bat
 .\build.bat windows-x64
 .\run.bat windows-x64

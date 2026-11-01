@@ -21,13 +21,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
           fetch-depth: ${{ inputs.tests && '0' || '1' }}
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Prepare the build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: tools/ci/Dockerfile
@@ -36,12 +36,12 @@ jobs:
           tags: chronicletwo-ci:build
           cache-from: type=gha,scope=ci-linux
           cache-to: type=gha,mode=max,scope=ci-linux,ignore-error=true
-      - uses: actions/cache@v5
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             .kazarov/ccache/linux
             .kazarov/cargo-target/linux
-            .kazarov/cargo-home
+            port/build/pc/cargo
           key: compile-linux-${{ inputs.tests && 'tests' || 'build' }}-${{ hashFiles('tools/ci/Dockerfile', 'tools/kazarov/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
             compile-linux-${{ inputs.tests && 'tests' || 'build' }}-${{ hashFiles('tools/ci/Dockerfile', 'tools/kazarov/Cargo.lock') }}-
@@ -54,12 +54,11 @@ jobs:
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/work" \
             -e PR_BASE -e BEFORE -e EVENT -e DEFAULT_BRANCH \
-            -e CARGO_HOME=/work/.kazarov/cargo-home \
             chronicletwo-ci:build bash tools/ci/linux.sh ${{ inputs.tests && 'tests' || 'build' }}
       - name: Restore cache ownership
         if: always()
         run: sudo chown -R "$(id -u):$(id -g)" .kazarov port/build
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always() && inputs.tests
         with:
           name: tests-linux
@@ -76,12 +75,12 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08@sha256:6ed6921bb5a9e1a916989971844f159b854b7b225880c381fa34f7a158863039
       options: --privileged
     env:
       MANIFEST: port/flatpak/ci.yml
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
 
@@ -108,7 +107,7 @@ jobs:
           ' port/flatpak/org.themoonpeople.ChronicleTwo.yml > "$MANIFEST"
           sed -n '/name: chronicletwo$/,$p' "$MANIFEST" | head -80
 
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@0fadf5d65cdfbdb9c94c7a2f3637c41206cc1a70 # v6
         with:
           manifest-path: ${{ env.MANIFEST }}
           bundle: chronicletwo.flatpak
@@ -118,7 +117,7 @@ jobs:
       # The packaged darkchronicle keeps its line tables (the manifest sets no-debuginfo), so it is its own
       # symbol file for tools/crash/symbolize.py.
       - name: Upload the Flatpak symbols
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: chronicletwo-flatpak-x86_64-symbols-${{ github.sha }}
           path: flatpak_app/files/bin/darkchronicle

@@ -28,11 +28,11 @@ jobs:
       HOMEBREW_NO_AUTO_UPDATE: 1
       HOMEBREW_NO_INSTALL_CLEANUP: 1
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: apple-dependencies-ios
           path: .kazarov/bundle
@@ -40,15 +40,17 @@ jobs:
         run: |
           test "$(shasum -a 256 .kazarov/bundle/deps.tar.gz | cut -d' ' -f1)" = "$(cat .kazarov/bundle/deps.sha256)"
           tar xzf .kazarov/bundle/deps.tar.gz -C .kazarov
-      - uses: actions/cache@v5
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ~/Library/Caches/Homebrew
             ~/.cargo/registry
             ~/.cargo/git
+            .kazarov/deps/bin
             .kazarov/ffmpeg/ios-arm64
             .kazarov/apple/ios-arm64
             .kazarov/cargo-target/ios
+            port/build/ios-arm64-release/cargo
             .kazarov/ccache/ios
             port/build/ios-arm64-release/lto-cache
           key: compile-ios-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock') }}-${{ github.sha }}
@@ -107,7 +109,7 @@ jobs:
           (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/DarkChronicle.ipa" Payload)
 
       - name: Upload the .ipa
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: DarkChronicle-ios-arm64
           path: DarkChronicle.ipa
@@ -115,7 +117,7 @@ jobs:
 
       # The symbols stay out of the .ipa but are kept to read the addresses in a device's stack reports.
       - name: Upload the debug symbols
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: DarkChronicle-ios-arm64-dSYM
           path: port/build/ios-arm64-release/darkchronicle.app/darkchronicle.dSYM

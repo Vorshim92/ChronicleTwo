@@ -1,6 +1,8 @@
 # Run iOS compatibility regressions on the simulator without the desktop suite's subprocess/death-test APIs.
 cmake_minimum_required(VERSION 3.25)
 project(ChronicleTwoIosTests CXX)
+# The standard-library oracle requires iOS 26; the game retains its iOS 16.3 minimum.
+set(CMAKE_OSX_DEPLOYMENT_TARGET 26.0)
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

@@ -62,6 +62,11 @@ public:
     static ArenaLifetime Capture(const mgCMemory &memory);
 
     /**
+     * Captures the live producer block containing a specific allocation.
+     */
+    static ArenaLifetime Capture(const mgCMemory &memory, const void *allocation);
+
+    /**
      * Reports whether the captured generation, parent chain and heap block remain live.
      */
     [[nodiscard]] bool IsLive() const;
