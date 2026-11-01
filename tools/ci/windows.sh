@@ -47,6 +47,8 @@ for line in (build / 'rust-tests.json').read_text().splitlines():
         shutil.copy2(executable, destination / executable.name)
 for dll in build.glob('*.dll'):
     shutil.copy2(dll, destination / dll.name)
+shutil.copy2(build / 'assets/data.zip', destination / 'data.zip')
+shutil.copy2(build / 'ffmpeg.exe', destination / 'ffmpeg.exe')
 PY
 fi
 ccache --show-stats

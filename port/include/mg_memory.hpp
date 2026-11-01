@@ -52,7 +52,7 @@ enum class ArenaResetKind {
 };
 
 /**
- * Tracks an explicit producer's generation and optional active heap-block identity.
+ * Tracks an explicit producer's generation and optional heap-block identity.
  */
 class ArenaLifetime {
 public:
@@ -90,7 +90,7 @@ private:
     friend class ArenaResource;
     const mgCMemory *owner = nullptr; /**< Explicit producer whose storage supplies the resources. */
     std::uint64_t    generation = 0;  /**< Producer generation captured without retaining its controller. */
-    std::uint64_t    heap_block = 0;  /**< Exact active heap block, or zero for a standalone binding. */
+    std::uint64_t    heap_block = 0;  /**< Exact producer heap block, or zero for a standalone binding. */
 };
 
 static_assert(std::is_trivially_copyable_v<ArenaLifetime>);

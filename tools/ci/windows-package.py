@@ -55,6 +55,8 @@ def package(mode):
     files.update(BUILD.glob("*-LICENSE.txt"))
     runtime_files = set(files)
     if mode == "tests":
+        files.add(BUILD / "compile_commands.json")
+        files.add(BUILD / "rust-tests/data.zip")
         files.update(BUILD.rglob("*.exe"))
         files.update(BUILD.rglob("*.dll"))
         files.update(path for path in BUILD.rglob("*.cmake") if "_deps" not in path.parts)

@@ -113,7 +113,7 @@ jobs:
       - name: Test Rust data publisher
         shell: pwsh
         run: |
-          $tests = @(Get-ChildItem port/build/windows-cross-x64-release/rust-tests/*.exe)
+          $tests = @(Get-ChildItem port/build/windows-cross-x64-release/rust-tests/*.exe | Where-Object Name -ne 'ffmpeg.exe')
           if (!$tests.Count) { throw 'No cross-compiled Rust tests were packaged' }
           foreach ($test in $tests) {
             & $test.FullName
