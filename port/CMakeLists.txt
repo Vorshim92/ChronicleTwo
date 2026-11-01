@@ -442,10 +442,39 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(CMAKE_Swift_FLAGS "-sdk ${CT_IOS_SDK}")
     set(CMAKE_Swift_LANGUAGE_VERSION 5)
     enable_language(Swift)
-    add_library(ct_ios_swift STATIC ${PORT_DIR}/ios/Launcher.swift ${PORT_DIR}/ios/TouchOverlay.swift
+    set(CT_IOS_SWIFT_SOURCES ${PORT_DIR}/ios/Launcher.swift ${PORT_DIR}/ios/TouchOverlay.swift
         ${PORT_DIR}/ios/Haptics.swift)
-    target_compile_options(ct_ios_swift PRIVATE -cxx-interoperability-mode=default "SHELL:-Xcc -std=c++20"
-        "SHELL:-I ${PORT_DIR}/ios")
+    set(CT_IOS_SWIFT_ASSEMBLY ${CMAKE_CURRENT_BINARY_DIR}/ct_ios_swift.s)
+    set(CT_IOS_SWIFT_OBJECT ${CMAKE_CURRENT_BINARY_DIR}/ct_ios_swift.o)
+    if(NOT CT_IOS_DWARF_ASSEMBLER)
+        set(CT_IOS_DWARF_ASSEMBLER "$ENV{CT_IOS_DWARF_ASSEMBLER}")
+        if(NOT CT_IOS_DWARF_ASSEMBLER)
+            set(CT_IOS_DWARF_ASSEMBLER ${CMAKE_CXX_COMPILER})
+        endif()
+    endif()
+    # Compact unwind has only three personality slots. Swift, Rust, Objective-C and C++ need four;
+    # assemble Swift with DWARF unwinding to retain its exceptions without using a compact slot.
+    execute_process(COMMAND ${CT_IOS_DWARF_ASSEMBLER} -target ${CMAKE_Swift_COMPILER_TARGET}
+        -femit-dwarf-unwind=dwarf-only -x assembler -c /dev/null -o ${CMAKE_CURRENT_BINARY_DIR}/ct_ios_unwind_probe.o
+        RESULT_VARIABLE CT_IOS_UNWIND_RESULT ERROR_VARIABLE CT_IOS_UNWIND_ERROR)
+    if(NOT CT_IOS_UNWIND_RESULT EQUAL 0)
+        message(FATAL_ERROR "iOS requires a DWARF-only assembler (LLVM 23+). Set CT_IOS_DWARF_ASSEMBLER. ${CT_IOS_UNWIND_ERROR}")
+    endif()
+    add_custom_command(OUTPUT ${CT_IOS_SWIFT_ASSEMBLY}
+        COMMAND ${CMAKE_Swift_COMPILER} -emit-assembly -whole-module-optimization -parse-as-library
+            -module-name ct_ios_swift -swift-version 5 -target ${CMAKE_Swift_COMPILER_TARGET}
+            -sdk ${CT_IOS_SDK} -cxx-interoperability-mode=default -Xcc -std=c++20 -I ${PORT_DIR}/ios
+            "$<IF:$<CONFIG:Debug>,-Onone,-O>" -g ${CT_IOS_SWIFT_SOURCES} -o ${CT_IOS_SWIFT_ASSEMBLY}
+        DEPENDS ${CT_IOS_SWIFT_SOURCES} ${PORT_DIR}/ios/bridge.hpp ${PORT_DIR}/ios/module.modulemap
+        VERBATIM)
+    add_custom_command(OUTPUT ${CT_IOS_SWIFT_OBJECT}
+        COMMAND ${CT_IOS_DWARF_ASSEMBLER} -target ${CMAKE_Swift_COMPILER_TARGET} -isysroot ${CT_IOS_SDK}
+            -femit-dwarf-unwind=dwarf-only -c ${CT_IOS_SWIFT_ASSEMBLY} -o ${CT_IOS_SWIFT_OBJECT}
+        DEPENDS ${CT_IOS_SWIFT_ASSEMBLY}
+        VERBATIM)
+    set_source_files_properties(${CT_IOS_SWIFT_OBJECT} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+    add_library(ct_ios_swift STATIC ${CT_IOS_SWIFT_OBJECT})
+    set_target_properties(ct_ios_swift PROPERTIES LINKER_LANGUAGE CXX)
     target_link_libraries(darkchronicle PRIVATE ct_ios_swift)
     # clang++ links, so the C++ flags apply; the Swift runtime is in iOS, its back-deployment and C++ interop
     # libraries in the toolchain.

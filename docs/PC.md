@@ -85,6 +85,9 @@ The iOS arm64 build requires macOS and Xcode with Swift C++ interoperability. Th
 and packages an unsigned IPA with its scripts, glyphs and gameplay seed. It targets iOS 27 and later;
 install the IPA through a sideloading tool that signs it for your device.
 
+Swift assembly requires LLVM 23 or newer for DWARF-only unwinding. Install Homebrew's `llvm` package
+and export `CT_IOS_DWARF_ASSEMBLER="$(brew --prefix llvm)/bin/clang"` when building locally.
+
 For a local build, export Docker's `apple-deps` target into `.kazarov`, then run
 `bash tools/ci/apple-deps.sh ios-arm64` on macOS. Outside Actions it records the environment in
 `.kazarov/apple.env` and the cxxbridge path in `.kazarov/apple.path`. Configure `ios-arm64-release` with `SDL3_DIR`, `Vulkan_INCLUDE_DIR`

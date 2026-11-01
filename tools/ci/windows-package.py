@@ -15,12 +15,13 @@ BUILD = ROOT / "port/build/windows-cross-x64-release"
 def relocate():
     """Resolve host tool and checkout paths before CTest discovers native tests."""
     cmake = pathlib.Path(shutil.which("cmake")).as_posix()
-    info = subprocess.check_output([cmake, "--system-information"], text=True)
-    modules = re.search(r'^CMAKE_ROOT "(.+)"$', info, re.MULTILINE)[1] + "/Modules"
+    discovery = BUILD / "cmake/GoogleTestAddTests.cmake"
+    if not discovery.is_file():
+        raise RuntimeError("The test bundle lacks its matching GoogleTest discovery module")
     for path in BUILD.rglob("*.cmake"):
         text = path.read_text()
         text = text.replace("/work/", ROOT.as_posix() + "/")
-        text = re.sub(r"/usr/share/cmake-[\d.]+/Modules", lambda _: modules, text)
+        text = re.sub(r"/usr/share/cmake-[\d.]+/Modules/GoogleTestAddTests\.cmake", lambda _: discovery.as_posix(), text)
         text = text.replace("/usr/bin/cmake", cmake)
         text = text.replace("/usr/bin/python3", pathlib.Path(sys.executable).as_posix())
         path.write_text(text)
@@ -55,10 +56,23 @@ def package(mode):
     files.update(BUILD.glob("*-LICENSE.txt"))
     runtime_files = set(files)
     if mode == "tests":
+        # Discovery scripts and their private CMake module must use the same argument format.
+        info = subprocess.check_output(["cmake", "--system-information"], text=True)
+        modules = pathlib.Path(re.search(r'^CMAKE_ROOT "(.+)"$', info, re.MULTILINE)[1]) / "Modules"
+        discovery = BUILD / "cmake/GoogleTestAddTests.cmake"
+        discovery.parent.mkdir(exist_ok=True)
+        shutil.copyfile(modules / discovery.name, discovery)
+        if (modules / "GoogleTest").is_dir():
+            shutil.copytree(modules / "GoogleTest", discovery.parent / "GoogleTest", dirs_exist_ok=True)
+        files.add(discovery)
+        license_file = discovery.parent / "CMake-LICENSE.txt"
+        shutil.copyfile("/usr/share/doc/cmake/copyright", license_file)
+        files.add(license_file)
         files.add(BUILD / "compile_commands.json")
         files.add(BUILD / "rust-tests/data.zip")
         files.update(BUILD.rglob("*.exe"))
         files.update(BUILD.rglob("*.dll"))
+        files.update(BUILD.rglob("*.pdb"))
         files.update(path for path in BUILD.rglob("*.cmake") if "_deps" not in path.parts)
     output = ROOT / "artifacts"
     output.mkdir(exist_ok=True)
