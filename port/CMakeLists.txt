@@ -485,8 +485,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     get_filename_component(CT_IOS_LLVM_BIN "${CT_IOS_DWARF_ASSEMBLER}" DIRECTORY)
     file(GLOB CT_IOS_SWIFT_OVERLAYS "${CT_SWIFT_LIBRARIES}/libswiftCxx*.a"
         "${CT_IOS_SDK}/usr/lib/swift/libswiftCxx*.a")
-    add_custom_command(TARGET ct_ios_swift POST_BUILD
-        COMMAND python3 -c [=[
+    set(CT_IOS_UNWIND_REPORT "${CMAKE_CURRENT_BINARY_DIR}/ct_ios_unwind_report.py")
+    file(GENERATE OUTPUT "${CT_IOS_UNWIND_REPORT}" CONTENT [=[
 import collections
 import subprocess
 import sys
@@ -499,7 +499,10 @@ for path in sys.argv[2:]:
     ordered = sorted(counts.items(), key=lambda entry: ("personality function:" not in entry[0], -entry[1]))
     for description, count in ordered[:40]:
         print(f"  {count}: {description}", flush=True)
-]=] "${CT_IOS_LLVM_BIN}/llvm-objdump" ${CT_IOS_SWIFT_OBJECT} ${CT_IOS_SWIFT_OVERLAYS}
+]=])
+    add_custom_command(TARGET ct_ios_swift POST_BUILD
+        COMMAND python3 "${CT_IOS_UNWIND_REPORT}" "${CT_IOS_LLVM_BIN}/llvm-objdump"
+            ${CT_IOS_SWIFT_OBJECT} ${CT_IOS_SWIFT_OVERLAYS}
         VERBATIM)
     target_link_options(darkchronicle PRIVATE "LINKER:-why_live,__swift_exceptionPersonality")
 endif()
