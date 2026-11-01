@@ -37,6 +37,7 @@ jobs:
       CCACHE_BASEDIR: ${{ github.workspace }}
       CCACHE_COMPILERCHECK: content
       KZ_PIPELINE_COMPILER_THREADS: 2
+      KZ_PIPELINE_PREWARM: 0
       HOMEBREW_NO_AUTO_UPDATE: 1
       HOMEBREW_NO_INSTALL_CLEANUP: 1
       # These 14 rendering tests read back black frames or wrong pixels only on the hosted runner's virtual

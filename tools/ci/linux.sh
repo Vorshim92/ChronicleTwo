@@ -13,6 +13,7 @@ export CCACHE_BASEDIR=/work
 export CCACHE_COMPILERCHECK=content
 export MESA_SHADER_CACHE_DIR=/work/.kazarov/mesa-cache/linux
 export KZ_PIPELINE_COMPILER_THREADS=${KZ_PIPELINE_COMPILER_THREADS:-2}
+export KZ_PIPELINE_PREWARM=0
 tests=OFF
 preset=linux-x64-release
 if [ "$mode" = tests ]; then

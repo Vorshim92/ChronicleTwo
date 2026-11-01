@@ -1132,7 +1132,14 @@ void ExpectNewestAtEveryAlpha() {
     ASSERT_TRUE(mgPortCanonicalReadColor(gfx::kMainTarget, canonical, width, height));
     for (float alpha : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
         ASSERT_TRUE(PresentScreenshotDisplay(alpha, display, width, height));
-        EXPECT_EQ(display, canonical) << alpha;
+        ASSERT_EQ(display.size(), canonical.size());
+        const auto mismatch = std::mismatch(display.begin(), display.end(), canonical.begin());
+        if (mismatch.first != display.end()) {
+            const auto offset = static_cast<size_t>(mismatch.first - display.begin());
+            EXPECT_EQ(display, canonical) << "alpha " << alpha << ", pixel " << offset / 4 % width << ", "
+                                          << offset / 4 / width << ", channel " << offset % 4 << ": "
+                                          << static_cast<int>(*mismatch.first) << " versus " << static_cast<int>(*mismatch.second);
+        }
     }
 }
 } // namespace

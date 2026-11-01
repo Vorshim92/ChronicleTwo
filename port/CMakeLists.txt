@@ -481,6 +481,27 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_target_properties(darkchronicle PROPERTIES LINKER_LANGUAGE CXX)
     get_filename_component(CT_SWIFT_LIBRARIES "${CMAKE_Swift_COMPILER}/../../lib/swift/iphoneos" ABSOLUTE)
     target_link_directories(darkchronicle PRIVATE ${CT_IOS_SDK}/usr/lib/swift ${CT_SWIFT_LIBRARIES})
+    # Identify compact-unwind personalities in the app object and static C++ interop overlays.
+    get_filename_component(CT_IOS_LLVM_BIN "${CT_IOS_DWARF_ASSEMBLER}" DIRECTORY)
+    file(GLOB CT_IOS_SWIFT_OVERLAYS "${CT_SWIFT_LIBRARIES}/libswiftCxx*.a"
+        "${CT_IOS_SDK}/usr/lib/swift/libswiftCxx*.a")
+    add_custom_command(TARGET ct_ios_swift POST_BUILD
+        COMMAND python3 -c [=[
+import collections
+import subprocess
+import sys
+for path in sys.argv[2:]:
+    result = subprocess.run([sys.argv[1], "--macho", "--unwind-info", path],
+                            check=True, capture_output=True, text=True)
+    counts = collections.Counter(line.strip() for line in result.stdout.splitlines()
+                                 if "personality function:" in line or "compact encoding:" in line)
+    print("Compact unwind:", path, flush=True)
+    ordered = sorted(counts.items(), key=lambda entry: ("personality function:" not in entry[0], -entry[1]))
+    for description, count in ordered[:40]:
+        print(f"  {count}: {description}", flush=True)
+]=] "${CT_IOS_LLVM_BIN}/llvm-objdump" ${CT_IOS_SWIFT_OBJECT} ${CT_IOS_SWIFT_OVERLAYS}
+        VERBATIM)
+    target_link_options(darkchronicle PRIVATE "LINKER:-why_live,__swift_exceptionPersonality")
 endif()
 if(WIN32)
     target_link_options(darkchronicle PRIVATE -municode)
