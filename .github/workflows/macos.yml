@@ -30,7 +30,7 @@ jobs:
     name: ${{ (inputs.tests || github.event_name == 'push' || github.event_name == 'pull_request') && 'Build and test (macOS)' || 'Build (macOS)' }}
     needs: dependencies
     timeout-minutes: 60
-    runs-on: macos-26
+    runs-on: xcode-27
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/.kazarov/cargo-target/macos
       CCACHE_DIR: ${{ github.workspace }}/.kazarov/ccache/macos
@@ -69,7 +69,7 @@ jobs:
             ~/.cargo/git
             .kazarov/deps/bin
             .kazarov/ffmpeg/darwin-arm64
-          key: native-deps-macos-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}
+          key: native-deps-macos-xcode27-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}
       - name: Restore reusable compiler outputs
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         id: compile-cache
@@ -79,16 +79,16 @@ jobs:
             port/build/macos-arm64-release/cargo
             .kazarov/ccache/macos
             port/build/macos-arm64-release/lto-cache
-          key: compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-${{ github.run_attempt }}
+          key: compile-macos-v2-xcode27-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-${{ github.run_attempt }}
           restore-keys: |
-            compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-
-            compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-
-            compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+            compile-macos-v2-xcode27-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-
+            compile-macos-v2-xcode27-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-
+            compile-macos-v2-xcode27-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
             compile-macos-v2-
       - name: Rebuild Rust outputs after dependency changes
         env:
           RESTORED_CACHE_KEY: ${{ steps.compile-cache.outputs.cache-matched-key }}
-          DEPENDENCY_CACHE_PREFIX: compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+          DEPENDENCY_CACHE_PREFIX: compile-macos-v2-xcode27-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
         run: |
           python3 - <<'PY'
           import os
@@ -130,23 +130,26 @@ jobs:
         if: env.RUN_TESTS == 'true'
         run: ctest --preset macos-arm64-release --no-tests=error --output-junit tests.xml -E "$MACOS_GPU_REPORT_ONLY"
 
-      - name: Diagnose Metal descriptor handling
+      - name: Diagnose Metal command and memory handling
         if: failure() && steps.functional-tests.outcome == 'failure'
         shell: bash
         run: |
-          unset KZ_BINDLESS MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS
+          unset KZ_BINDLESS MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS MVK_CONFIG_USE_COMMAND_POOLING \
+            MVK_CONFIG_PREFILL_METAL_COMMAND_BUFFERS MVK_CONFIG_USE_MTLHEAP MVK_CONFIG_FAST_MATH_ENABLED
           build="$GITHUB_WORKSPACE/port/build/macos-arm64-release"
           directory="$build/Testing/Temporary/metal-diagnostics"
           mkdir -p "$directory"
           filter='^(MglibAspect\.(MenuFormsKeepMessageCursorAndTailWhole|MenuFormsParkPastHalfScaleUi|MenuFormsParkPastOneAndAHalfScaleUi|MenuFormsParkVerticallyOnTallWindow)|TargetPresentation\.WorldLifeGaugeInterpolatesPositionAndHealthAndReuseCuts)$'
-          for mode in bound-textures direct-metal-resources both; do
+          for mode in command-pooling prefill metal-heaps precise-math; do
             case "$mode" in
-              bound-textures) settings=(KZ_BINDLESS=0) ;;
-              direct-metal-resources) settings=(MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=0) ;;
-              both) settings=(KZ_BINDLESS=0 MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=0) ;;
+              command-pooling) settings=(MVK_CONFIG_USE_COMMAND_POOLING=0) ;;
+              prefill) settings=(MVK_CONFIG_PREFILL_METAL_COMMAND_BUFFERS=1) ;;
+              metal-heaps) settings=(MVK_CONFIG_USE_MTLHEAP=0) ;;
+              precise-math) settings=(MVK_CONFIG_FAST_MATH_ENABLED=0) ;;
             esac
             log="$directory/$mode.log"
-            if env "${settings[@]}" ctest --test-dir "$build" -j1 --no-tests=error \
+            if env "${settings[@]}" DC2_CAPTURE_DIR="$directory/$mode-pixels" \
+              ctest --test-dir "$build" -j1 --no-tests=error \
               --fixture-exclude-any gpu_pipeline_cache --timeout 60 -R "$filter" \
               --output-on-failure --output-junit "$directory/$mode.xml" > "$log" 2>&1; then
               echo "$mode: passed"
@@ -158,9 +161,35 @@ jobs:
           exit 0
 
       - name: Test cases the hosted runner's virtual GPU renders wrongly (report only)
+        id: known-gpu-tests
         if: env.RUN_TESTS == 'true'
         continue-on-error: true
         run: ctest --preset macos-arm64-release -R "$MACOS_GPU_REPORT_ONLY"
+
+      - name: Package the reusable GPU test runtime
+        id: package-gpu-runtime
+        if: always() && (steps.functional-tests.outcome == 'failure' || steps.known-gpu-tests.outcome == 'failure')
+        run: |
+          build="$GITHUB_WORKSPACE/port/build/macos-arm64-release"
+          metadata="$GITHUB_WORKSPACE/artifacts/macos-gpu-runtime"
+          mkdir -p "$metadata"
+          git rev-parse HEAD > "$metadata/source.sha"
+          for binary in darkchronicle_tests darkchronicle dc2data; do
+            otool -L "$build/$binary"
+          done > "$metadata/dylibs.txt"
+          tar -czf artifacts/macos-gpu-test-runtime.tar.gz -C "$build" \
+            darkchronicle_tests darkchronicle dc2data assets/data.zip scripts fonts glyphs \
+            -C "$metadata" source.sha dylibs.txt
+
+      - name: Upload the reusable GPU test runtime
+        if: always() && steps.package-gpu-runtime.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: macos-gpu-test-runtime
+          path: artifacts/macos-gpu-test-runtime.tar.gz
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
 
       - name: Test Rust data publisher
         if: env.RUN_TESTS == 'true'

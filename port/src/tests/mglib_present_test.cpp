@@ -1135,6 +1135,13 @@ void ExpectNewestAtEveryAlpha() {
         ASSERT_EQ(display.size(), canonical.size());
         const auto mismatch = std::mismatch(display.begin(), display.end(), canonical.begin());
         if (mismatch.first != display.end()) {
+            const char *capture = std::getenv("DC2_CAPTURE_DIR");
+            const auto  directory = capture ? std::filesystem::path(capture) : std::filesystem::path("Testing/Temporary/metal-pixels");
+            std::filesystem::create_directories(directory);
+            const auto *test = testing::UnitTest::GetInstance()->current_test_info();
+            const auto  name = std::string(test->name()) + "_";
+            EXPECT_TRUE(gfx::WritePng(directory / (name + "canonical.png"), canonical.data(), width, height));
+            EXPECT_TRUE(gfx::WritePng(directory / (name + std::to_string(alpha) + "_display.png"), display.data(), width, height));
             const auto offset = static_cast<size_t>(mismatch.first - display.begin());
             EXPECT_EQ(display, canonical) << "alpha " << alpha << ", pixel " << offset / 4 % width << ", "
                                           << offset / 4 / width << ", channel " << offset % 4 << ": "
