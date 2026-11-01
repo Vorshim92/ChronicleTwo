@@ -79,11 +79,32 @@ jobs:
             port/build/macos-arm64-release/cargo
             .kazarov/ccache/macos
             port/build/macos-arm64-release/lto-cache
-          key: compile-macos-v2-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-${{ github.run_attempt }}
+          key: compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-${{ github.run_attempt }}
           restore-keys: |
-            compile-macos-v2-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-
-            compile-macos-v2-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-
+            compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-
+            compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-
+            compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
             compile-macos-v2-
+      - name: Rebuild Rust outputs after dependency changes
+        env:
+          RESTORED_CACHE_KEY: ${{ steps.compile-cache.outputs.cache-matched-key }}
+          DEPENDENCY_CACHE_PREFIX: compile-macos-v2-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/apple-deps.sh', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import shutil
+          key = os.environ['RESTORED_CACHE_KEY']
+          if key and not key.startswith(os.environ['DEPENDENCY_CACHE_PREFIX']):
+              workspace = Path(os.environ['GITHUB_WORKSPACE']).resolve()
+              targets = [workspace / '.kazarov/cargo-target/macos', workspace / 'port/build/macos-arm64-release/cargo']
+              if any(not target.resolve().is_relative_to(workspace) for target in targets):
+                  raise SystemExit('Rust cache paths must stay inside the workspace')
+              for target in targets:
+                  if target.exists():
+                      shutil.rmtree(target)
+              print('Dependency inputs changed; cached Rust outputs will be rebuilt.')
+          PY
       - name: Install the native Apple toolchain
         id: prepare-native-deps
         run: bash tools/ci/apple-deps.sh macos-arm64
