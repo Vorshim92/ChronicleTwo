@@ -38,14 +38,10 @@ jobs:
       CCACHE_COMPILERCHECK: content
       KZ_PIPELINE_COMPILER_THREADS: 2
       KZ_PIPELINE_PREWARM: 0
+      # Direct Metal allocations preserve draws the hosted Paravirtual GPU omits with heaps.
+      MVK_CONFIG_USE_MTLHEAP: "0"
       HOMEBREW_NO_AUTO_UPDATE: 1
       HOMEBREW_NO_INSTALL_CLEANUP: 1
-      # These 14 rendering tests read back black frames or wrong pixels only on the hosted runner's virtual
-      # GPU (Apple Paravirtual device under MoltenVK). The same test binary passes all 14 on Apple Silicon
-      # hardware (M3, macOS 27.0.1, MoltenVK 1.4.2), and Linux CI gates them on lavapipe. They are reported
-      # here without failing the job; remove this once the runner's GPU renders them correctly.
-      MACOS_GPU_REPORT_ONLY: >-
-        ^(MgDrawPrimRender\.LinearAtlasCellsKeepTopOutlinesWithoutSamplingTheNextCell|MgShadow\.OverlappingCastersShadeTheirUnionNotTheirSum|MgVisual\.DrawManagerPathMatchesDirect|MgVisual\.DirectMaterialUsesItsOwnTextureWrap|MgVisual\.QueuedMaterialRetainsItsOwnTextureWrap|MglibAspect\.MenuFormsHideParkedStatsWithoutClippingEnteringPanel|MglibPresent\.BackBufferCapturePreservesWidePixelsAndHoldsUntilRecaptured|MglibSeam\.ReusedTextureKeyDoesNotSampleRetiredRenderTarget|MenuIconGpu\.ItemDrawSamplesSelectedAtlasCellsInCanonicalAndDisplayFrames|MenuIconGpu\.EffectUsesSelectedBakedRgbaAtlasAndRestoresNormally|MgTextureGpu\.HighResolutionKeepsLogicalCpuStrideAndSpriteBounds|GfxGpuMeshDc2\.RefSphere|GfxGpuMeshDc2\.Prog0CullModeFollowsFlagAndMirror|GfxGpuDisplayList\.PresentationCompositeDoesNotWriteTransparentDepth)$
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -128,7 +124,7 @@ jobs:
       - name: Test
         id: functional-tests
         if: env.RUN_TESTS == 'true'
-        run: ctest --preset macos-arm64-release --no-tests=error --output-junit tests.xml -E "$MACOS_GPU_REPORT_ONLY"
+        run: ctest --preset macos-arm64-release --no-tests=error --output-junit tests.xml
 
       - name: Diagnose Metal command and memory handling
         if: failure() && steps.functional-tests.outcome == 'failure'
@@ -160,15 +156,9 @@ jobs:
           done
           exit 0
 
-      - name: Test cases the hosted runner's virtual GPU renders wrongly (report only)
-        id: known-gpu-tests
-        if: env.RUN_TESTS == 'true'
-        continue-on-error: true
-        run: ctest --preset macos-arm64-release -R "$MACOS_GPU_REPORT_ONLY"
-
       - name: Package the reusable GPU test runtime
         id: package-gpu-runtime
-        if: always() && (steps.functional-tests.outcome == 'failure' || steps.known-gpu-tests.outcome == 'failure')
+        if: always() && steps.functional-tests.outcome == 'failure'
         run: |
           build="$GITHUB_WORKSPACE/port/build/macos-arm64-release"
           metadata="$GITHUB_WORKSPACE/artifacts/macos-gpu-runtime"
