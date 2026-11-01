@@ -42,6 +42,9 @@ jobs:
           cache-from: type=gha,scope=ci-ps2
           cache-to: type=gha,mode=max,scope=ci-ps2,ignore-error=true
 
+      - name: Test verified dependency acquisition
+        run: tools/kazarov/scripts/kazarov shell /usr/bin/python3 -m pytest tools/kazarov/tests/test_kz_ffmpeg.py -q
+
       - name: Test pinned compiler hooks
         run: |
           tools/kazarov/scripts/kazarov shell sh -ec '
