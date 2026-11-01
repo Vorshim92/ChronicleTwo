@@ -41,17 +41,19 @@ jobs:
           tags: chronicletwo-ci:windows
           cache-from: type=gha,scope=ci-windows
           cache-to: type=gha,mode=max,scope=ci-windows,ignore-error=true
-      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        id: compile-cache
         with:
           path: |
             .kazarov/ccache/windows-cross
             .kazarov/cargo-target/windows-cross
             port/build/windows-cross-x64-release/cargo
             port/build/windows-cross-x64-release/lto-cache
-          key: compile-windows-cross-${{ hashFiles('tools/ci/**', 'tools/kazarov/Cargo.lock') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}
+          key: compile-windows-cross-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/windows-toolchain.cmake', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-${{ github.run_attempt }}
           restore-keys: |
-            compile-windows-cross-${{ hashFiles('tools/ci/**', 'tools/kazarov/Cargo.lock') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-
-            compile-windows-cross-${{ hashFiles('tools/ci/**', 'tools/kazarov/Cargo.lock') }}-
+            compile-windows-cross-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/windows-toolchain.cmake', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-${{ github.sha }}-
+            compile-windows-cross-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/windows-toolchain.cmake', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-${{ env.RUN_TESTS == 'true' && 'tests' || 'build' }}-
+            compile-windows-cross-${{ hashFiles('tools/ci/Dockerfile', 'tools/ci/windows-toolchain.cmake', 'tools/kazarov/Cargo.lock', 'tools/kazarov/tools/ffmpeg/kz-ffmpeg') }}-
       - name: Build Windows executables
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/work" \
@@ -81,6 +83,17 @@ jobs:
           path: artifacts/chronicletwo-windows-x64-symbols.zip
           compression-level: 0
           if-no-files-found: error
+      - name: Save reusable compiler outputs
+        if: always() && steps.compile-cache.outputs.cache-primary-key != '' && steps.compile-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            .kazarov/ccache/windows-cross
+            .kazarov/cargo-target/windows-cross
+            port/build/windows-cross-x64-release/cargo
+            port/build/windows-cross-x64-release/lto-cache
+          key: ${{ steps.compile-cache.outputs.cache-primary-key }}
+
   test:
     name: Tests (Windows)
     if: inputs.tests || github.event_name == 'push' || github.event_name == 'pull_request'

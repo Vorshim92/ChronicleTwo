@@ -22,7 +22,7 @@ jobs:
   ios:
     name: Tests (iOS simulator)
     needs: ios-dependencies
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 20
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -46,10 +46,10 @@ jobs:
           import json, os, subprocess
           devices = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"]))
           phones = [device for runtime, group in devices["devices"].items() if ".iOS-" in runtime
-                    and int(runtime.split(".iOS-")[1].split("-")[0]) >= 26
+                    and int(runtime.split(".iOS-")[1].split("-")[0]) >= 27
                     for device in group if device["name"].startswith("iPhone") and device["isAvailable"]]
           if not phones:
-              raise SystemExit("The standard-library oracle requires an available iOS 26 or newer simulator")
+              raise SystemExit("The standard-library oracle requires an available iOS 27 or newer simulator")
           phone = phones[0]
           if phone["state"] != "Booted":
               subprocess.run(["xcrun", "simctl", "boot", phone["udid"]], check=True)
@@ -63,7 +63,7 @@ jobs:
           brew list --versions ninja >/dev/null 2>&1 || brew install ninja
           cmake -S port/src/tests/ios -B port/build/ios-tests -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_OSX_SYSROOT=iphonesimulator -DCMAKE_OSX_DEPLOYMENT_TARGET=16.3 \
+            -DCMAKE_OSX_SYSROOT=iphonesimulator -DCMAKE_OSX_DEPLOYMENT_TARGET=27.0 \
             -DCMAKE_BUILD_TYPE=Release \
             "-DCMAKE_CROSSCOMPILING_EMULATOR=xcrun;simctl;spawn;$SIMULATOR_UDID"
           cmake --build port/build/ios-tests --parallel "$(sysctl -n hw.ncpu)"

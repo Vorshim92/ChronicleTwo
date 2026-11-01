@@ -9,7 +9,9 @@ export CARGO_BUILD_JOBS=$CMAKE_BUILD_PARALLEL_LEVEL
 export CARGO_NET_OFFLINE=true
 export CARGO_TARGET_DIR=/work/.kazarov/cargo-target/windows-cross
 export CCACHE_DIR=/work/.kazarov/ccache/windows-cross
-export CCACHE_BASEDIR=/work CCACHE_COMPILERCHECK=content
+export CCACHE_BASEDIR=/work
+# The MinGW driver is a shell wrapper; identify the compiler it invokes.
+export CCACHE_COMPILERCHECK="string:$(sha256sum /opt/llvm/bin/clang | cut -d' ' -f1)"
 export CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER=x86_64-w64-mingw32-clang
 export CC_x86_64_pc_windows_gnullvm=x86_64-w64-mingw32-clang
 export CXX_x86_64_pc_windows_gnullvm=x86_64-w64-mingw32-clang++

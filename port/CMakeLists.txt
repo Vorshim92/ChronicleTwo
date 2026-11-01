@@ -1,5 +1,13 @@
 # The x64 port: native game sources built with clang as C++26 for the host.
 
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET 27.0 CACHE STRING "Minimum supported iOS version" FORCE)
+    elseif(CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS 27.0)
+        message(FATAL_ERROR "The iOS port requires iOS 27.0 or newer")
+    endif()
+endif()
+
 if(NOT CMAKE_CXX_COMPILER)
     set(CMAKE_CXX_COMPILER clang++)
 endif()
@@ -260,7 +268,7 @@ set(NATIVE_SOURCES
 list(TRANSFORM NATIVE_SOURCES PREPEND "${PORT_DIR}/")
 file(GLOB_RECURSE PORT_SOURCES CONFIGURE_DEPENDS ${PORT_DIR}/*.cpp)
 list(FILTER PORT_SOURCES EXCLUDE REGEX "/tests/")
-list(REMOVE_ITEM PORT_SOURCES ${NATIVE_SOURCES} ${PORT_DIR}/ios/to_chars.cpp)
+list(REMOVE_ITEM PORT_SOURCES ${NATIVE_SOURCES})
 if(NINTENDO_SWITCH)
     list(FILTER PORT_SOURCES EXCLUDE REGEX "/ios/|/crash/(crash|crash_dialog|crash_report|crash_symbols)\\.cpp$")
 else()
@@ -444,10 +452,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_target_properties(darkchronicle PROPERTIES LINKER_LANGUAGE CXX)
     get_filename_component(CT_SWIFT_LIBRARIES "${CMAKE_Swift_COMPILER}/../../lib/swift/iphoneos" ABSOLUTE)
     target_link_directories(darkchronicle PRIVATE ${CT_IOS_SDK}/usr/lib/swift ${CT_SWIFT_LIBRARIES})
-    # iOS 16's libc++ lacks std::to_chars for floating point, which std::format calls; the executable defines it.
-    add_library(ct_ios_to_chars OBJECT ${PORT_DIR}/ios/to_chars.cpp)
-    set_target_properties(ct_ios_to_chars PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
-    target_link_libraries(darkchronicle PRIVATE ct_ios_to_chars)
 endif()
 if(WIN32)
     target_link_options(darkchronicle PRIVATE -municode)

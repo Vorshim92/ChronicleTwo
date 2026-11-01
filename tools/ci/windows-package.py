@@ -63,12 +63,22 @@ def package(mode):
     output = ROOT / "artifacts"
     output.mkdir(exist_ok=True)
     executable = BUILD / "darkchronicle.exe"
-    symbols = subprocess.check_output(["llvm-nm", str(executable)], text=True)
-    address = re.search(r"^([0-9a-fA-F]+) T wmain$", symbols, re.MULTILINE)
+    # PE links with PDB output can omit COFF symbols while retaining the crash handler's DWARF.
+    debug_info = subprocess.check_output(["llvm-dwarfdump", "--name=wmain", str(executable)], text=True)
+    address = None
+    for entry in re.split(r"\n\s*\n", debug_info):
+        if "DW_TAG_subprogram" in entry and re.search(r'DW_AT_name\s+\("wmain"\)', entry):
+            address = re.search(r"DW_AT_low_pc\s+\((0x[0-9a-fA-F]+)\)", entry)
+            if address is not None:
+                break
     if address is None:
-        raise RuntimeError("Windows executable has no wmain symbol")
+        raise RuntimeError("Windows executable has no defined wmain in its retained DWARF")
+    headers = subprocess.check_output(["llvm-readobj", "--file-headers", str(executable)], text=True)
+    image_base = re.search(r"ImageBase:\s*(0x[0-9a-fA-F]+)", headers)
+    if image_base is None:
+        raise RuntimeError("Windows executable has no PE image base")
     report = output / "windows-symbol-check.txt"
-    report.write_text(f"#0  darkchronicle.exe+0x{int(address[1], 16) - 0x140000000:x}\n")
+    report.write_text(f"#0  darkchronicle.exe+0x{int(address[1], 16) - int(image_base[1], 16):x}\n")
     symbolized = subprocess.check_output([
         sys.executable, str(ROOT / "tools/crash/symbolize.py"), str(report),
         "--binary", str(executable), "--llvm-symbolizer", shutil.which("llvm-symbolizer"),
